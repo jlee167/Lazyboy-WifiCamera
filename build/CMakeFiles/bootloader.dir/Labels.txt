@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/CMakeFiles/bootloader
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/CMakeFiles/bootloader.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/CMakeFiles/bootloader-complete.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/lazyboyindustries/Desktop/esp/lazyboy_camera/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
