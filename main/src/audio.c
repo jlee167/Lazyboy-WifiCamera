@@ -32,30 +32,41 @@ static const i2s_pin_config_t pin_config = {
 static const i2s_config_t i2s_config = {
     .mode = I2S_MODE_MASTER | I2S_MODE_RX,
     .sample_rate = 48000,//44100,
-    .bits_per_sample = 24,//16,
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-    .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,//24,//16,
+    .channel_format = I2S_CHANNEL_FMT_ALL_RIGHT,//I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .communication_format = I2S_COMM_FORMAT_STAND_MSB,
     .intr_alloc_flags = 0, // default interrupt priority
     .dma_buf_count = 8,
     .dma_buf_len = 64,
     .use_apll = false
 };
 
-void audio_init(){
-    i2s_set_pin(AUDIO_I2S_CHANNEL, &pin_config);
-    i2s_driver_install(AUDIO_I2S_CHANNEL, &i2s_config, 0, NULL);
-}
 
+void audio_init(){
+    i2s_driver_install(AUDIO_I2S_CHANNEL, &i2s_config, 0, NULL);
+    printf("[I2S] driver installed\n");
+    i2s_set_pin(AUDIO_I2S_CHANNEL, &pin_config);
+    printf("[I2S] pin set\n");
+}
 
 
 void audio_pause(){
     i2s_stop(AUDIO_I2S_CHANNEL);
 }
 
+
 void audio_resume(){
     i2s_start(AUDIO_I2S_CHANNEL);
 }
 
+
 void audio_stop(){
-     i2s_driver_uninstall(AUDIO_I2S_CHANNEL);
+    i2s_driver_uninstall(AUDIO_I2S_CHANNEL);
+}
+
+
+size_t audio_read(char* pcm_data, int length) {
+    size_t bytes_read;
+    i2s_read(AUDIO_I2S_CHANNEL, pcm_data, length, &bytes_read, 100);
+    return bytes_read;
 }
