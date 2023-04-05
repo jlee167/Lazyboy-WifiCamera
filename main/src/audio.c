@@ -33,11 +33,11 @@ static const i2s_config_t i2s_config = {
     .mode = I2S_MODE_MASTER | I2S_MODE_RX,
     .sample_rate = 48000,//44100,
     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,//24,//16,
-    .channel_format = I2S_CHANNEL_FMT_ALL_RIGHT,//I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_MSB,
     .intr_alloc_flags = 0, // default interrupt priority
     .dma_buf_count = 8,
-    .dma_buf_len = 64,
+    .dma_buf_len = 1024,//64,
     .use_apll = false
 };
 

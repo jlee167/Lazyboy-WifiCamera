@@ -36,6 +36,7 @@ static bool cam_active;
 static void worker_io(void *p);
 static void worker_video(void *p);
 static void worker_audio(void *p);
+static void worker_audio_send(void *p);
 
 static void stabilize_gpio(int gpio_num);
 static void setup_gpio(void);
@@ -52,8 +53,10 @@ network_packet access_token;
 TaskHandle_t io_task_handle;
 TaskHandle_t video_task_handle;
 TaskHandle_t audio_task_handle;
+TaskHandle_t audio_send_task_handle;
 
-volatile char buf_i2s[8*1024];
+int audio_buf_tail=0, audio_buf_head=0;
+char buf_i2s[3][8*1024];
 
 bool running = false;
 
@@ -165,6 +168,8 @@ static void process_image(camera_fb_t *fb_p)
  * @param p 
  */
 static void worker_io(void *p) {
+    printf("[TASK] Starting IO Task\n");
+
     while (true) {
         if (capture_pressed) {
             printf("capture_pressed\n");
@@ -188,6 +193,7 @@ static void worker_io(void *p) {
  */
 static void worker_video(void *p)
 {
+    printf("[TASK] Video Sample Start\n");
     while(true) {
         if (running)
         {
@@ -199,6 +205,7 @@ static void worker_video(void *p)
                 //send_image(access_token.data, video_url.data, fb);
                 //android_send_udp((uint8_t *)buf_i2s, 1024);
                 android_send_udp(fb->buf, fb->len);
+                
                 return_fb(fb);
             }
         }
@@ -214,15 +221,39 @@ static void worker_video(void *p)
  * @param p
  */
 static void worker_audio(void *p) {
+    printf("[TASK] Audio Sample Start\n");
+
+    static int cnt=0;
+
     while (true) {
-        if (running) {
-            audio_read(buf_i2s, 8*1024);
-            android_send_audio((uint8_t *)buf_i2s, 8*1024);
-            printf("Audio Sent");
+        if (running) {          
+            audio_read(buf_i2s[audio_buf_head], 8*1024);
+
+            if (audio_buf_head < 2)
+                audio_buf_head++;
+            else
+                audio_buf_head = 0;
         }
     }
 }
 
+
+static void worker_audio_send(void *p) {
+    printf("[TASK] Starting Audio Send Task\n");
+
+    while (true) {
+        if (running) {
+            if (audio_buf_head == audio_buf_tail)
+                continue;
+
+            android_send_audio((uint8_t *)buf_i2s[audio_buf_tail], 8*1024);
+            if (audio_buf_tail < 2)
+                audio_buf_tail++;
+            else
+                audio_buf_tail = 0;
+        }
+    }
+}
 
 
 
@@ -253,31 +284,80 @@ void app_main(void)
     printf("\n\nPeripheral setup done!\n\n");
 
     android_connect();  
-
-    xTaskCreate(
+    int err;
+    err = xTaskCreatePinnedToCore(
         worker_video,
         "worker_video",
         8000,
         NULL,
         tskIDLE_PRIORITY,
-        &video_task_handle
+        &video_task_handle,
+        0
     );
 
-    xTaskCreate(
+    printf("ERR: %d\n", err);
+
+    err = xTaskCreatePinnedToCore(
         worker_audio,
         "worker_audio",
         10000,
         NULL,
         tskIDLE_PRIORITY,
-        &audio_task_handle
+        &audio_task_handle,
+        1
     );
 
-    xTaskCreate(
+    printf("ERR: %d\n", err);
+
+    err = xTaskCreatePinnedToCore(
+        worker_audio_send,
+        "worker_audio_send",
+        6000,
+        NULL,
+        tskIDLE_PRIORITY,
+        &audio_send_task_handle,
+        1
+    );
+
+    printf("ERR: %d\n", err);
+    
+
+    err = xTaskCreatePinnedToCore(
         worker_io,
         "worker_io",
         1024,//10000,
         NULL,
         tskIDLE_PRIORITY,
-        &io_task_handle
+        &io_task_handle,
+        0
     );
+
+    printf("ERR: %d\n", err);
+
+    // xTaskCreate(
+    //     worker_video,
+    //     "worker_video",
+    //     8000,
+    //     NULL,
+    //     tskIDLE_PRIORITY,
+    //     &video_task_handle
+    // );
+
+    // xTaskCreate(
+    //     worker_audio,
+    //     "worker_audio",
+    //     10000,
+    //     NULL,
+    //     tskIDLE_PRIORITY,
+    //     &audio_task_handle
+    // );
+
+    // xTaskCreate(
+    //     worker_io,
+    //     "worker_io",
+    //     1024,//10000,
+    //     NULL,
+    //     tskIDLE_PRIORITY,
+    //     &io_task_handle
+    // );
 }
