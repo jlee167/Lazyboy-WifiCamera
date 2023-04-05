@@ -27,6 +27,9 @@
 
 #define CAPTURE_BUTTON GPIO_NUM_13
 
+#define CORE_0  (0)
+#define CORE_1  (1)
+
 volatile int debounce = 0;
 static bool capture_pressed = false;
 static bool wifi_connected;
@@ -55,10 +58,17 @@ TaskHandle_t video_task_handle;
 TaskHandle_t audio_task_handle;
 TaskHandle_t audio_send_task_handle;
 
-int audio_buf_tail=0, audio_buf_head=0;
+UBaseType_t io_task_priority;
+UBaseType_t video_task_priority;
+UBaseType_t audio_task_priority;
+UBaseType_t audio_send_task_priority;
+
+int audio_buf_tail = 0; 
+int audio_buf_head = 0;
 char buf_i2s[3][8*1024];
 
 bool running = false;
+
 
 
 /**
@@ -73,6 +83,10 @@ static void btn_click_handler(void *arg)
         debounce = 0;
         capture_pressed = true;
         gpio_intr_disable(GPIO_NUM_13);
+
+        /* Notify GPIO task to run once */
+        BaseType_t xHigherPriorityTaskWoken = pdTRUE;
+        vTaskNotifyGiveFromISR(io_task_handle, &xHigherPriorityTaskWoken);
     }
     else
     {
@@ -168,18 +182,22 @@ static void process_image(camera_fb_t *fb_p)
  * @param p 
  */
 static void worker_io(void *p) {
-    printf("[TASK] Starting IO Task\n");
+    
 
     while (true) {
+        printf("[TASK] Starting IO Task\n");
+        
         if (capture_pressed) {
             printf("capture_pressed\n");
             volatile int k = 0;
             running = !running;
-            //while (k < DEBOUNCE_WAIT_TICKS) {k++;};
             stabilize_gpio(GPIO_NUM_13);
             gpio_intr_enable(GPIO_NUM_13);
             capture_pressed = false;
         }
+
+        /* Wait indefenitely for GPIO Interrupt notification*/
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     }
 }
 
@@ -274,6 +292,13 @@ static void setup_camera()
  
 void app_main(void)
 {
+    /* Task Priority Settings */
+    io_task_priority = tskIDLE_PRIORITY + 1;
+    video_task_priority = tskIDLE_PRIORITY; 
+    audio_task_priority = tskIDLE_PRIORITY;
+    audio_send_task_priority = tskIDLE_PRIORITY;
+
+
     init_flags();
     setup_gpio();
     init_wifi();
@@ -290,9 +315,9 @@ void app_main(void)
         "worker_video",
         8000,
         NULL,
-        tskIDLE_PRIORITY,
+        video_task_priority,
         &video_task_handle,
-        0
+        CORE_0
     );
 
     printf("ERR: %d\n", err);
@@ -302,9 +327,9 @@ void app_main(void)
         "worker_audio",
         10000,
         NULL,
-        tskIDLE_PRIORITY,
+        audio_task_priority,
         &audio_task_handle,
-        1
+        CORE_1
     );
 
     printf("ERR: %d\n", err);
@@ -314,9 +339,9 @@ void app_main(void)
         "worker_audio_send",
         6000,
         NULL,
-        tskIDLE_PRIORITY,
+        audio_send_task_priority,
         &audio_send_task_handle,
-        1
+        CORE_1
     );
 
     printf("ERR: %d\n", err);
@@ -325,39 +350,12 @@ void app_main(void)
     err = xTaskCreatePinnedToCore(
         worker_io,
         "worker_io",
-        1024,//10000,
+        1024,
         NULL,
-        tskIDLE_PRIORITY,
+        io_task_priority,
         &io_task_handle,
-        0
+        CORE_0
     );
 
     printf("ERR: %d\n", err);
-
-    // xTaskCreate(
-    //     worker_video,
-    //     "worker_video",
-    //     8000,
-    //     NULL,
-    //     tskIDLE_PRIORITY,
-    //     &video_task_handle
-    // );
-
-    // xTaskCreate(
-    //     worker_audio,
-    //     "worker_audio",
-    //     10000,
-    //     NULL,
-    //     tskIDLE_PRIORITY,
-    //     &audio_task_handle
-    // );
-
-    // xTaskCreate(
-    //     worker_io,
-    //     "worker_io",
-    //     1024,//10000,
-    //     NULL,
-    //     tskIDLE_PRIORITY,
-    //     &io_task_handle
-    // );
 }
