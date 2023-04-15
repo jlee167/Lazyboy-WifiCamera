@@ -30,6 +30,9 @@
 #define CORE_0  (0)
 #define CORE_1  (1)
 
+#define SIZE_I2S_SAMPLE     (8*1024)   
+
+
 volatile int debounce = 0;
 static bool capture_pressed = false;
 static bool wifi_connected;
@@ -65,7 +68,7 @@ UBaseType_t audio_send_task_priority;
 
 int audio_buf_tail = 0; 
 int audio_buf_head = 0;
-char buf_i2s[3][8*1024];
+char buf_i2s[3][SIZE_I2S_SAMPLE];
 
 bool running = false;
 
@@ -244,7 +247,7 @@ static void worker_audio(void *p) {
 
     while (true) {
         if (running) {          
-            audio_read(buf_i2s[audio_buf_head], 8*1024);
+            audio_read(buf_i2s[audio_buf_head], SIZE_I2S_SAMPLE);
 
             ptr_buf = (uint8_t *)buf_i2s[audio_buf_tail];
             xQueueSend(audio_queue_handle, (void *)&ptr_buf, portMAX_DELAY);
@@ -269,7 +272,7 @@ static void worker_audio_send(void *p) {
             if (audio_buf_head == audio_buf_tail)
                 continue;
             xQueueReceive(audio_queue_handle, &ptr_buf, portMAX_DELAY);
-            android_send_audio(ptr_buf, 8*1024);
+            android_send_audio(ptr_buf, SIZE_I2S_SAMPLE);
         }
     }
 }
@@ -298,7 +301,7 @@ void app_main(void)
     audio_task_priority = tskIDLE_PRIORITY;
     audio_send_task_priority = tskIDLE_PRIORITY;
 
-    audio_queue_handle = xQueueCreate(8*1024, sizeof(uint8_t *));
+    audio_queue_handle = xQueueCreate(SIZE_I2S_SAMPLE, sizeof(uint8_t *));
 
 
     init_flags();
