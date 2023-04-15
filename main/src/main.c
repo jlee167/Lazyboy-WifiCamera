@@ -43,7 +43,7 @@ static void worker_audio_send(void *p);
 
 static void stabilize_gpio(int gpio_num);
 static void setup_gpio(void);
-static void btn_click_handler(void *arg);
+static void isr_btn_click(void *arg);
 void notify_connection(bool success);
 
 static camera_fb_t *fb;
@@ -71,12 +71,13 @@ bool running = false;
 
 
 
+
 /**
  * @brief Handle button press events. 
  *        Debouncing logicss: counter, interrupt disabling  
  * @param arg 
  */
-static void btn_click_handler(void *arg)
+static void isr_btn_click(void *arg)
 {
     if (debounce > DEBOUNCE_ITER_MIN)
     {
@@ -143,7 +144,7 @@ static void setup_gpio(void)
     stabilize_gpio(GPIO_NUM_13);
     gpio_set_level(GPIO_NUM_14, 0);
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(CAPTURE_BUTTON, btn_click_handler, (void *)CAPTURE_BUTTON);
+    gpio_isr_handler_add(CAPTURE_BUTTON, isr_btn_click, (void *)CAPTURE_BUTTON);
     gpio_intr_enable(GPIO_NUM_13);
 }
 
@@ -183,21 +184,17 @@ static void process_image(camera_fb_t *fb_p)
  */
 static void worker_io(void *p) {
     
+    printf("[TASK] Starting IO Task\n");
 
     while (true) {
-        printf("[TASK] Starting IO Task\n");
-        
-        if (capture_pressed) {
-            printf("capture_pressed\n");
-            volatile int k = 0;
-            running = !running;
-            stabilize_gpio(GPIO_NUM_13);
-            gpio_intr_enable(GPIO_NUM_13);
-            capture_pressed = false;
-        }
-
         /* Wait indefenitely for GPIO Interrupt notification*/
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        printf("Capture Button Pressed\n");
+
+        running = !running;
+        stabilize_gpio(GPIO_NUM_13);
+        gpio_intr_enable(GPIO_NUM_13);
+        capture_pressed = false;
     }
 }
 
@@ -212,6 +209,7 @@ static void worker_io(void *p) {
 static void worker_video(void *p)
 {
     printf("[TASK] Video Sample Start\n");
+
     while(true) {
         if (running)
         {
@@ -240,8 +238,6 @@ static void worker_video(void *p)
  */
 static void worker_audio(void *p) {
     printf("[TASK] Audio Sample Start\n");
-
-    static int cnt=0;
 
     while (true) {
         if (running) {          
@@ -288,7 +284,6 @@ static void setup_camera()
 }
 
 
-
  
 void app_main(void)
 {
@@ -306,11 +301,10 @@ void app_main(void)
     audio_init();
     audio_resume();
     
-    printf("\n\nPeripheral setup done!\n\n");
-
+    printf("Peripheral setup done!\n");
     android_connect();  
-    int err;
-    err = xTaskCreatePinnedToCore(
+    
+    xTaskCreatePinnedToCore(
         worker_video,
         "worker_video",
         8000,
@@ -320,34 +314,8 @@ void app_main(void)
         CORE_0
     );
 
-    printf("ERR: %d\n", err);
 
-    err = xTaskCreatePinnedToCore(
-        worker_audio,
-        "worker_audio",
-        10000,
-        NULL,
-        audio_task_priority,
-        &audio_task_handle,
-        CORE_1
-    );
-
-    printf("ERR: %d\n", err);
-
-    err = xTaskCreatePinnedToCore(
-        worker_audio_send,
-        "worker_audio_send",
-        6000,
-        NULL,
-        audio_send_task_priority,
-        &audio_send_task_handle,
-        CORE_1
-    );
-
-    printf("ERR: %d\n", err);
-    
-
-    err = xTaskCreatePinnedToCore(
+    xTaskCreatePinnedToCore(
         worker_io,
         "worker_io",
         1024,
@@ -357,5 +325,25 @@ void app_main(void)
         CORE_0
     );
 
-    printf("ERR: %d\n", err);
+
+    xTaskCreatePinnedToCore(
+        worker_audio,
+        "worker_audio",
+        10000,
+        NULL,
+        audio_task_priority,
+        &audio_task_handle,
+        CORE_1
+    );
+
+
+    xTaskCreatePinnedToCore(
+        worker_audio_send,
+        "worker_audio_send",
+        6000,
+        NULL,
+        audio_send_task_priority,
+        &audio_send_task_handle,
+        CORE_1
+    );   
 }
