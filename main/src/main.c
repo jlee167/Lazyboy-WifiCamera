@@ -69,7 +69,7 @@ char buf_i2s[3][8*1024];
 
 bool running = false;
 
-
+QueueHandle_t audio_queue_handle;
 
 
 /**
@@ -220,7 +220,7 @@ static void worker_video(void *p)
                 printf("Frame Number: %d\n", frame_cnt);
                 //send_image(access_token.data, video_url.data, fb);
                 //android_send_udp((uint8_t *)buf_i2s, 1024);
-                android_send_udp(fb->buf, fb->len);
+                //android_send_udp(fb->buf, fb->len);
                 
                 return_fb(fb);
             }
@@ -237,11 +237,17 @@ static void worker_video(void *p)
  * @param p
  */
 static void worker_audio(void *p) {
+
+    uint8_t *ptr_buf;
+
     printf("[TASK] Audio Sample Start\n");
 
     while (true) {
         if (running) {          
             audio_read(buf_i2s[audio_buf_head], 8*1024);
+
+            ptr_buf = (uint8_t *)buf_i2s[audio_buf_tail];
+            xQueueSend(audio_queue_handle, (void *)&ptr_buf, portMAX_DELAY);
 
             if (audio_buf_head < 2)
                 audio_buf_head++;
@@ -253,18 +259,17 @@ static void worker_audio(void *p) {
 
 
 static void worker_audio_send(void *p) {
+
+    uint8_t *ptr_buf;
+
     printf("[TASK] Starting Audio Send Task\n");
 
     while (true) {
         if (running) {
             if (audio_buf_head == audio_buf_tail)
                 continue;
-
-            android_send_audio((uint8_t *)buf_i2s[audio_buf_tail], 8*1024);
-            if (audio_buf_tail < 2)
-                audio_buf_tail++;
-            else
-                audio_buf_tail = 0;
+            xQueueReceive(audio_queue_handle, &ptr_buf, portMAX_DELAY);
+            android_send_audio(ptr_buf, 8*1024);
         }
     }
 }
@@ -292,6 +297,8 @@ void app_main(void)
     video_task_priority = tskIDLE_PRIORITY; 
     audio_task_priority = tskIDLE_PRIORITY;
     audio_send_task_priority = tskIDLE_PRIORITY;
+
+    audio_queue_handle = xQueueCreate(8*1024, sizeof(uint8_t *));
 
 
     init_flags();
