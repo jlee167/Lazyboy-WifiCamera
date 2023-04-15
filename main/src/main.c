@@ -219,8 +219,8 @@ static void worker_video(void *p)
                 frame_cnt++;
                 printf("Frame Number: %d\n", frame_cnt);
                 //send_image(access_token.data, video_url.data, fb);
-                //android_send_udp((uint8_t *)buf_i2s, 1024);
-                //android_send_udp(fb->buf, fb->len);
+                android_send_udp((uint8_t *)buf_i2s, 1024);
+                android_send_udp(fb->buf, fb->len);
                 
                 return_fb(fb);
             }
